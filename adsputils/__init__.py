@@ -212,7 +212,7 @@ def load_module(filename):
     return res
 
 
-def setup_logging(name_, level=None, proj_home=None):
+def setup_logging(name_, level=None, proj_home=None, attach_stdout=False):
     """
     Sets up generic logging to file with rotating files on disk
 
@@ -260,6 +260,11 @@ def setup_logging(name_, level=None, proj_home=None):
     logging_instance.handlers = []
     logging_instance.addHandler(rfh)
     logging_instance.setLevel(level)
+
+    if attach_stdout:
+        stdout = logging.StreamHandler(sys.stdout)
+        stdout.formatter = get_json_formatter()
+        logging_instance.addHandler(stdout)
 
     return logging_instance
 
@@ -324,7 +329,9 @@ class ADSCelery(Celery):
             self._config.update(local_config) #our config
         if not proj_home:
             proj_home = self._config.get('PROJ_HOME', None)
-        self.logger = setup_logging(app_name, proj_home=proj_home, level=self._config.get('LOGGING_LEVEL', 'INFO'))
+        self.logger = setup_logging(app_name, proj_home=proj_home,
+                                    level=self._config.get('LOGGING_LEVEL', 'INFO'),
+                                    attach_stdout=self._config.get('LOG_STDOUT', False))
 
         # make sure that few important params are set for celery
         if 'broker' not in kwargs:
@@ -545,6 +552,7 @@ class JsonFormatter(jsonlogger.JsonFormatter, object):
             log_record["timestamp"] = log_record["asctime"]
         else:
             log_record["timestamp"] = datetime.datetime.utcnow().strftime(TIMESTAMP_FMT)
+            log_record["asctime"] = log_record["timestamp"]
 
         if self._extra is not None:
             for key, value in self._extra.items():
