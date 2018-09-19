@@ -19,6 +19,8 @@ import imp
 import sys
 import time
 import socket
+import json
+import ast
 from dateutil import parser, tz
 from datetime import datetime
 import inspect
@@ -45,20 +47,20 @@ def on_celery_setup_logging(**kwargs):
     """Update the Celery logging system. We don't touch anything
     but the formatters (to be safe and not to mess up something
     important)."""
-    
+
     logger = kwargs['logger']
     colorize = kwargs['colorize']
-    
+
     # replace the default formatters
     for handler in logger.handlers:
         formatter = handler.formatter
-        handler.formatter = get_json_formatter(use_color=colorize, 
-                                    logfmt=formatter._fmt, 
+        handler.formatter = get_json_formatter(use_color=colorize,
+                                    logfmt=formatter._fmt,
                                     datefmt=TIMESTAMP_FMT)
-        
+
     logger.debug('ADSPipelineUtils reconfigured %s to use JSONFormatter', logger)
-        
-    
+
+
 
 
 def _get_proj_home(extra_frames=0):
@@ -122,15 +124,15 @@ def date2solrstamp(t):
     """
     Received datetime object and returns it formatted the way that
     SOLR likes (variation on the ISO format).
-    
+
     @param t: datetime object (we expect it to be in UTC)
     @return: string
     """
-    
-    return t.strftime(TIMESTAMP_FMT)
-    
 
-def load_config(proj_home=None, extra_frames=0):
+    return t.strftime(TIMESTAMP_FMT)
+
+
+def load_config(proj_home=None, extra_frames=0, app_name=None):
     """
     Loads configuration from config.py and also from local_config.py
 
@@ -161,8 +163,32 @@ def load_config(proj_home=None, extra_frames=0):
 
     conf.update(load_module(os.path.join(proj_home, 'config.py')))
     conf.update(load_module(os.path.join(proj_home, 'local_config.py')))
+    conf_update_from_env(app_name or conf.get('SERVICE', ''), conf)
 
     return conf
+
+def conf_update_from_env(app_name, conf):
+    app_name = app_name.replace(".", "_").upper()
+    for key in conf.keys():
+        specific_app_key = "_".join((app_name, key))
+        if specific_app_key in os.environ:
+            # Highest priority: variables with app_name as prefix
+            _replace_value(conf, key, os.environ[specific_app_key])
+        elif key in os.environ:
+            _replace_value(conf, key, os.environ[key])
+
+def _replace_value(conf, key, new_value):
+    logging.info("Overwriting constant '%s' old value '%s' with new value '%s' from environment", key, conf[key], new_value)
+    try:
+        w = json.loads(new_value)
+        conf[key] = w
+    except:
+        try:
+            # Interpret numbers, booleans, etc...
+            conf[key] = ast.literal_eval(new_value)
+        except:
+            # String
+            conf[key] = new_value
 
 
 
@@ -199,16 +225,16 @@ def setup_logging(name_, level=None, proj_home=None):
     """
 
     if level is None:
-        config = load_config(extra_frames=1, proj_home=proj_home)
+        config = load_config(extra_frames=1, proj_home=proj_home, app_name=name_)
         level = config.get('LOGGING_LEVEL', 'INFO')
 
     level = getattr(logging, level)
 
-    
+
     #formatter = logging.Formatter(fmt=logfmt, datefmt=datefmt)
     #formatter = MultilineMessagesFormatter(fmt=logfmt, datefmt=datefmt)
     formatter = get_json_formatter()
-    
+
     formatter.multiline_marker = ''
     formatter.multiline_fmt = '     %(message)s'
 
@@ -290,7 +316,7 @@ class ADSCelery(Celery):
         proj_home = None
         if 'proj_home' in kwargs:
             proj_home = kwargs.pop('proj_home')
-        self._config = load_config(extra_frames=1, proj_home=proj_home)
+        self._config = load_config(extra_frames=1, proj_home=proj_home, app_name=app_name)
 
         local_config = None
         if 'local_config' in kwargs and kwargs['local_config']:
@@ -433,12 +459,12 @@ class ADSCelery(Celery):
         return Celery.task(self, *args, **opts)
 
 
-    
+
     def attempt_recovery(self, task, args=None, kwargs=None, einfo=None, retval=None):
         """Here you can try to recover from errors that Celery couldn't deal with.
-        
+
         Example:
-        
+
         if isinstance(retval, SoftTimeLimitExceeded):
             # half the number of processed objects
             first_half, second_half = args[0][0:len(args[0])/2], args[0][len(args[2]/2):]
@@ -447,7 +473,7 @@ class ADSCelery(Celery):
             task.apply_async(args=args, kwargs=kwargs)
             args[0] = second_half
             task.apply_async(args=args, kwargs=kwargs)
-            
+
         Returns: are ignored
         """
         pass
@@ -455,11 +481,11 @@ class ADSCelery(Celery):
 
 class ADSTask(Task):
     def on_failure(self, exc, task_id, args, kwargs, einfo):
-        
+
         if self.request.retries < self.max_retries:
             self.app.logger.info('Retrying %s because of exc=%s', task_id, exc)
             self.retry(countdown=2 ** self.request.retries + random.randint(1, 10), exc=exc)
-        
+
         self.app.logger.error('Task=%s failed.\nargs=%s\nkwargs=%s\ntrace=%s', task_id, args, kwargs, einfo)
         #print 'Task=%s failed.\nargs=%s\nkwargs=%s\ntrace=%s' % (task_id, args, kwargs, einfo)
 
@@ -467,7 +493,7 @@ class ADSTask(Task):
     def after_return(self, status, retval, task_id, args, kwargs, einfo):
         if status == 'FAILURE' and hasattr(self.app, 'attempt_recovery'):
             self.app.attempt_recovery(self, retval=retval, args=args, kwargs=kwargs, einfo=einfo)
-            
+
 
 class MultilineMessagesFormatter(Formatter):
     converter = time.gmtime
@@ -482,10 +508,10 @@ class MultilineMessagesFormatter(Formatter):
             return '\n     '.join(s.split('\n'))
         else:
             return s
-    
+
     def formatTime(self, record, datefmt=None):
         """logging uses time.strftime which doesn't understand
-        how to add microsecs. datetime understands that. so we 
+        how to add microsecs. datetime understands that. so we
         have to work around the old time.strftime here."""
         if datefmt:
             datefmt = datefmt.replace('%f', '%03d' % (record.msecs))
@@ -533,17 +559,17 @@ class JsonFormatter(jsonlogger.JsonFormatter, object):
         if isinstance(r, str) and not PY3:
             return safe_str(r)
         return r
-    
+
     def formatTime(self, record, datefmt=None):
         """logging uses time.strftime which doesn't understand
-        how to add microsecs. datetime understands that. so we 
+        how to add microsecs. datetime understands that. so we
         have to work around the old time.strftime here."""
         if datefmt:
             datefmt = datefmt.replace('%f', '%03d' % (record.msecs))
             return Formatter.formatTime(self, record, datefmt)
         else:
             return Formatter.formatTime(self, record, datefmt) # default ISO8601
-        
+
     def format(self, record):
         msg = jsonlogger.JsonFormatter.format(self, record)
         color = self.colors.get(record.levelname)
@@ -576,7 +602,7 @@ class JsonFormatter(jsonlogger.JsonFormatter, object):
         else:
             return safe_str(msg)
 
-def get_json_formatter(use_color=False, 
+def get_json_formatter(use_color=False,
                        logfmt = u'%(asctime)s,%(msecs)03d %(levelname)-8s [%(process)d:%(threadName)s:%(filename)s:%(lineno)d] %(message)s',
                        datefmt = TIMESTAMP_FMT):
     return JsonFormatter(logfmt, datefmt, extra={"hostname":socket.gethostname()}, use_color=use_color)
@@ -613,21 +639,21 @@ def u2asc(input):
 class UTCDateTime(types.TypeDecorator):
     """Value type for SQLAlachemy to be used for UTC datetime
     example usage (in your models.py)
-    
+
     from sqlalchemy.ext.declarative import declarative_base
     from adsmutils import get_date, UTCDateTime
     Base = declarative_base()
-    
+
     class Foo(Base):
         __tablename__ = 'foo'
         id = Column(Integer, primary_key=True)
         created = Column(UTCDateTime, default=get_date)
         updated = Column(UTCDateTime)
-    
+
     """
-    
+
     impl = TIMESTAMP(timezone=True)
-    
+
     def process_bind_param(self, value, engine):
         if isinstance(value, basestring):
             return get_date(value).astimezone(utc_zone)
