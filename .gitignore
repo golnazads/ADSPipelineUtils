@@ -102,3 +102,7 @@ ENV/
 
 # emacs
 *~
+
+*.idea
+logs/
+python

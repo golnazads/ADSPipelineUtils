@@ -21,6 +21,7 @@ import time
 import socket
 import json
 import ast
+import requests
 from dateutil import parser, tz
 from datetime import datetime
 import inspect
@@ -389,6 +390,18 @@ class ADSCelery(Celery):
                                       (args, kwargs))
                 self._forward_message = _forward_message
 
+        # HTTP connection pool
+        # - The maximum number of retries each connection should attempt: this
+        #   applies only to failed DNS lookups, socket connections and connection timeouts,
+        #   never to requests where data has made it to the server. By default,
+        #   requests does not retry failed connections.
+        # http://docs.python-requests.org/en/latest/api/?highlight=max_retries#requests.adapters.HTTPAdapter
+        self.client = requests.Session()
+        http_adapter = requests.adapters.HTTPAdapter(
+            pool_connections=self._config.get(u'REQUESTS_POOL_CONNECTIONS', 10),
+            pool_maxsize=self._config.get(u'REQUESTS_POOL_MAXSIZE', 1000),
+            max_retries=self._config.get(u'REQUESTS_POOL_RETRIES', 3), pool_block=False)
+        self.client.mount(u'http://', http_adapter)
 
     def _set_serializer(self):
         """
