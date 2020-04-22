@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 
+from builtins import str
 import sys
 import os
 
@@ -29,31 +30,35 @@ class TestAdsOrcidCelery(unittest.TestCase):
         with patch('adsputils.load_module') as load_module:
             c = adsputils.load_config()
             f = os.path.abspath(os.path.join(os.path.dirname(inspect.getsourcefile(adsputils)), '..'))
-            self.assertEquals((f + '/config.py',),
+            self.assertEqual((f + '/config.py',),
                               load_module.call_args_list[0][0])
-            self.assertEquals((f + '/local_config.py',),
+            self.assertEqual((f + '/local_config.py',),
                               load_module.call_args_list[1][0])
             self.assertEqual(c['PROJ_HOME'], f)
 
         with patch('adsputils.load_module') as load_module:
             adsputils.load_config('/tmp')
-            self.assertEquals(('/tmp/config.py',),
+            self.assertEqual(('/tmp/config.py',),
                               load_module.call_args_list[0][0])
-            self.assertEquals(('/tmp/local_config.py',),
+            self.assertEqual(('/tmp/local_config.py',),
                               load_module.call_args_list[1][0])
 
 
     def test_load_module(self):
         f = os.path.abspath(os.path.join(os.path.dirname(inspect.getsourcefile(adsputils)), './tests/config_sample.py'))
         x = adsputils.load_module(f)
-        self.assertEquals(x, {'FOO': {'bar': ['baz', 1]}})
+        self.assertEqual(x, {'FOO': {'bar': ['baz', 1]}})
 
 
     def test_setup_logging(self):
         with patch('adsputils.ConcurrentRotatingFileHandler') as cloghandler:
             adsputils.setup_logging('app')
             f = os.path.abspath(os.path.join(os.path.abspath(__file__), '../../..'))
-            self.assertEqual("call(backupCount=10, encoding=u'UTF-8', filename=u'{filename}/logs/app.log', maxBytes=10485760, mode=u'a')".format(filename=f),
+            if sys.version_info > (3,):
+                test_data = "call(backupCount=10, encoding='UTF-8', filename='{filename}/logs/app.log', maxBytes=10485760, mode='a')".format(filename=f)
+            else:
+                test_data = "call(backupCount=10, encoding=u'UTF-8', filename=u'{filename}/logs/app.log', maxBytes=10485760, mode=u'a')".format(filename=f)
+            self.assertEqual(test_data,
                              str(cloghandler.call_args))
 
 
@@ -84,7 +89,7 @@ class TestAdsOrcidCelery(unittest.TestCase):
         os.environ["ORCID_PIPELINE_BAR"] = "True"
         conf = {'FOO': 1, 'BAR': False}
         adsputils.conf_update_from_env("ORCID_PIPELINE", conf)
-        self.assertEquals(conf, {'FOO': 2, 'BAR': True})
+        self.assertEqual(conf, {'FOO': 2, 'BAR': True})
 
 
 class TestDbType(unittest.TestCase):

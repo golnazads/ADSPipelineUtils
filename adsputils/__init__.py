@@ -5,6 +5,7 @@ project, and so do not belong to anything specific.
 """
 
 from __future__ import absolute_import, unicode_literals
+from past.builtins import basestring
 from celery import Celery, Task, signals
 from celery.exceptions import SoftTimeLimitExceeded
 from contextlib import contextmanager
@@ -167,7 +168,7 @@ def load_config(proj_home=None, extra_frames=0, app_name=None):
 
 def conf_update_from_env(app_name, conf):
     app_name = app_name.replace(".", "_").upper()
-    for key in conf.keys():
+    for key in list(conf.keys()):
         specific_app_key = "_".join((app_name, key))
         if specific_app_key in os.environ:
             # Highest priority: variables with app_name as prefix
@@ -341,7 +342,7 @@ class ADSCelery(Celery):
                 cm = '.'.join(parts)
                 if '.tasks' not in cm:
                     self.logger.debug('It seems like you are not importing from \'.tasks\': %s', cm)
-                self.logger.warn('CELERY_INCLUDE is empty, we have to guess it (correct???): %s', cm)
+                self.logger.warning('CELERY_INCLUDE is empty, we have to guess it (correct???): %s', cm)
             kwargs['include'] = self._config.get('CELERY_INCLUDE', [cm])
 
         Celery.__init__(self, *args, **kwargs)
@@ -557,7 +558,7 @@ class JsonFormatter(jsonlogger.JsonFormatter, object):
             log_record["asctime"] = log_record["timestamp"]
 
         if self._extra is not None:
-            for key, value in self._extra.items():
+            for key, value in list(self._extra.items()):
                 log_record[key] = value
         return super(JsonFormatter, self).process_log_record(log_record)
 
@@ -630,7 +631,11 @@ def u2asc(input):
     """
 
     # TODO If used on anything but author names, add special handling for math symbols and other special chars
-    if not isinstance(input, unicode):
+    if sys.version_info < (3,):
+        test_type = unicode
+    else:
+        test_type = str
+    if not isinstance(input, test_type):
         try:
             input = input.decode('utf-8')
         except UnicodeDecodeError:
@@ -639,9 +644,9 @@ def u2asc(input):
     try:
         output = unidecode.unidecode(input)
     except UnicodeDecodeError:
-        raise UnicodeHandlerError ('Transliteration failed, check input.')
+        raise UnicodeHandlerError('Transliteration failed, check input.')
 
-    if not isinstance(input,unicode):
+    if not isinstance(input, test_type):
         output = output.encode('utf-8')
 
     return output

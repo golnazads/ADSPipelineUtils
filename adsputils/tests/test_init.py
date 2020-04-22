@@ -20,7 +20,7 @@ class TestInit(unittest.TestCase):
         if os.path.exists(foo_log):
             os.remove(foo_log)
         logger = adsputils.setup_logging('foo.bar')
-        logger.warn('first')
+        logger.warning('first')
         frameinfo = getframeinfo(currentframe())
 
         #print foo_log
@@ -37,8 +37,8 @@ class TestInit(unittest.TestCase):
 
         time.sleep(0.01)
         # now multiline message
-        logger.warn(u'second\nthird')
-        logger.warn('last')
+        logger.warning(u'second\nthird')
+        logger.warning('last')
         c = _read_file(foo_log)
 
         found = False
