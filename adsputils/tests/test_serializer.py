@@ -34,7 +34,11 @@ class TestAdsOrcidCelery(unittest.TestCase):
         cls, data = b.dump()
         
         self.assertEqual('adsmsg.bibrecord.BibRecord', cls)
-        self.assertEqual(data, '\n\x07bibcode') # let's hope the upstream adsmsg doesn't change impl...
+        if sys.version_info > (3,):
+            test_data = b'\n\x07bibcode'
+        else:
+            test_data = '\n\x07bibcode'
+        self.assertEqual(data, test_data) # let's hope the upstream adsmsg doesn't change impl...
         
         
         # dump using default 'json' serializer

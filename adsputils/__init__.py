@@ -5,6 +5,7 @@ project, and so do not belong to anything specific.
 """
 
 from __future__ import absolute_import, unicode_literals
+from past.builtins import basestring
 from celery import Celery, Task, signals
 from celery.exceptions import SoftTimeLimitExceeded
 from contextlib import contextmanager
@@ -56,12 +57,10 @@ def on_celery_setup_logging(**kwargs):
     for handler in logger.handlers:
         formatter = handler.formatter
         handler.formatter = get_json_formatter(use_color=colorize,
-                                    logfmt=formatter._fmt,
-                                    datefmt=TIMESTAMP_FMT)
+                                               logfmt=formatter._fmt,
+                                               datefmt=TIMESTAMP_FMT)
 
     logger.debug('ADSPipelineUtils reconfigured %s to use JSONFormatter', logger)
-
-
 
 
 def _get_proj_home(extra_frames=0):
@@ -85,7 +84,6 @@ def _get_proj_home(extra_frames=0):
     return d
 
 
-
 def get_date(timestr=None):
     """
     Always parses the time to be in the UTC time zone; or returns
@@ -104,7 +102,7 @@ def get_date(timestr=None):
     else:
         date = parser.parse(timestr)
 
-    if 'tzinfo' in repr(date): #hack, around silly None.encode()...
+    if 'tzinfo' in repr(date):  # hack, around silly None.encode()...
         date = date.astimezone(utc_zone)
     else:
         # this depends on current locale, for the moment when not
@@ -113,8 +111,8 @@ def get_date(timestr=None):
         # but to that we would have to know which timezone the
         # was created)
 
-        #local_date = date.replace(tzinfo=local_zone)
-        #date = date.astimezone(utc_zone)
+        # local_date = date.replace(tzinfo=local_zone)
+        # date = date.astimezone(utc_zone)
 
         date = date.replace(tzinfo=utc_zone)
 
@@ -156,7 +154,6 @@ def load_config(proj_home=None, extra_frames=0, app_name=None):
     else:
         proj_home = _get_proj_home(extra_frames=extra_frames)
 
-
     if proj_home not in sys.path:
         sys.path.append(proj_home)
 
@@ -168,15 +165,17 @@ def load_config(proj_home=None, extra_frames=0, app_name=None):
 
     return conf
 
+
 def conf_update_from_env(app_name, conf):
     app_name = app_name.replace(".", "_").upper()
-    for key in conf.keys():
+    for key in list(conf.keys()):
         specific_app_key = "_".join((app_name, key))
         if specific_app_key in os.environ:
             # Highest priority: variables with app_name as prefix
             _replace_value(conf, key, os.environ[specific_app_key])
         elif key in os.environ:
             _replace_value(conf, key, os.environ[key])
+
 
 def _replace_value(conf, key, new_value):
     logging.info("Overwriting constant '%s' old value '%s' with new value '%s' from environment", key, conf[key], new_value)
@@ -190,7 +189,6 @@ def _replace_value(conf, key, new_value):
         except:
             # String
             conf[key] = new_value
-
 
 
 def load_module(filename):
@@ -231,9 +229,8 @@ def setup_logging(name_, level=None, proj_home=None, attach_stdout=False):
 
     level = getattr(logging, level)
 
-
-    #formatter = logging.Formatter(fmt=logfmt, datefmt=datefmt)
-    #formatter = MultilineMessagesFormatter(fmt=logfmt, datefmt=datefmt)
+    # formatter = logging.Formatter(fmt=logfmt, datefmt=datefmt)
+    # formatter = MultilineMessagesFormatter(fmt=logfmt, datefmt=datefmt)
     formatter = get_json_formatter()
 
     formatter.multiline_marker = ''
@@ -303,7 +300,6 @@ def overrides(interface_class):
     return overrider
 
 
-
 class ADSCelery(Celery):
     """ADS Pipeline worker; used by all the pipeline applications.
 
@@ -327,7 +323,7 @@ class ADSCelery(Celery):
         local_config = None
         if 'local_config' in kwargs and kwargs['local_config']:
             local_config = kwargs.pop('local_config')
-            self._config.update(local_config) #our config
+            self._config.update(local_config) # our config
         if not proj_home:
             proj_home = self._config.get('PROJ_HOME', None)
         self.logger = setup_logging(app_name, proj_home=proj_home,
@@ -346,19 +342,18 @@ class ADSCelery(Celery):
                 cm = '.'.join(parts)
                 if '.tasks' not in cm:
                     self.logger.debug('It seems like you are not importing from \'.tasks\': %s', cm)
-                self.logger.warn('CELERY_INCLUDE is empty, we have to guess it (correct???): %s', cm)
+                self.logger.warning('CELERY_INCLUDE is empty, we have to guess it (correct???): %s', cm)
             kwargs['include'] = self._config.get('CELERY_INCLUDE', [cm])
 
         Celery.__init__(self, *args, **kwargs)
         self._set_serializer()
 
-
-        self.conf.update(self._config) #celery's config (devs should be careful to avoid clashes)
+        self.conf.update(self._config)  # celery's config (devs should be careful to avoid clashes)
 
         self._engine = self._session = None
         if self._config.get('SQLALCHEMY_URL', None):
             self._engine = create_engine(self._config.get('SQLALCHEMY_URL', 'sqlite:///'),
-                                   echo=self._config.get('SQLALCHEMY_ECHO', False))
+                                         echo=self._config.get('SQLALCHEMY_ECHO', False))
             self._session_factory = sessionmaker()
             self._session = scoped_session(self._session_factory)
             self._session.configure(bind=self._engine)
@@ -380,9 +375,9 @@ class ADSCelery(Celery):
             if self.conf.get('OUTPUT_TASKNAME', None):
 
                 @self.task(name=self._config['OUTPUT_TASKNAME'],
-                     exchange=self._config.get('OUTPUT_EXCHANGE', 'ads-pipeline'),
-                     queue=self._config.get('OUTPUT_QUEUE', 'update-record'),
-                     routing_key=self._config.get('OUTPUT_QUEUE', 'update-record'))
+                           exchange=self._config.get('OUTPUT_EXCHANGE', 'ads-pipeline'),
+                           queue=self._config.get('OUTPUT_QUEUE', 'update-record'),
+                           routing_key=self._config.get('OUTPUT_QUEUE', 'update-record'))
                 def _forward_message(self, *args, **kwargs):
                     """A handler that can be used to forward stuff out of our
                     queue. It does nothing (it doesn't process data)"""
@@ -411,11 +406,9 @@ class ADSCelery(Celery):
         if 'adsmsg' not in registry.name_to_type:
             register('adsmsg', *register_args)
 
-
         self.conf['CELERY_ACCEPT_CONTENT'] = ['adsmsg', 'json']
         self.conf['CELERY_TASK_SERIALIZER'] = 'adsmsg'
         self.conf['CELERY_RESULT_SERIALIZER'] = 'adsmsg'
-
 
     def forward_message(self, *args, **kwargs):
         """Class method that is replaced during initializiton with the real
@@ -435,12 +428,10 @@ class ADSCelery(Celery):
             return '%s.%s' % (parts[-2], parts[-1].split('.')[0])
         return m.__name__
 
-
     def close_app(self):
         """Closes the app"""
         self._session = self._engine = self._session_factory = None
         self.logger = None
-
 
     @contextmanager
     def session_scope(self):
@@ -469,7 +460,6 @@ class ADSCelery(Celery):
         finally:
             s.close()
 
-
     def task(self, *args, **opts):
         """Our modification to the Celery.task."""
         if 'base' not in opts:
@@ -477,8 +467,6 @@ class ADSCelery(Celery):
         if 'max_retries' not in opts:
             opts['max_retries'] = 1
         return Celery.task(self, *args, **opts)
-
-
 
     def attempt_recovery(self, task, args=None, kwargs=None, einfo=None, retval=None):
         """Here you can try to recover from errors that Celery couldn't deal with.
@@ -507,8 +495,7 @@ class ADSTask(Task):
             self.retry(countdown=2 ** self.request.retries + random.randint(1, 10), exc=exc)
 
         self.app.logger.error('Task=%s failed.\nargs=%s\nkwargs=%s\ntrace=%s', task_id, args, kwargs, einfo)
-        #print 'Task=%s failed.\nargs=%s\nkwargs=%s\ntrace=%s' % (task_id, args, kwargs, einfo)
-
+        # print 'Task=%s failed.\nargs=%s\nkwargs=%s\ntrace=%s' % (task_id, args, kwargs, einfo)
 
     def after_return(self, status, retval, task_id, args, kwargs, einfo):
         if status == 'FAILURE' and hasattr(self.app, 'attempt_recovery'):
@@ -517,6 +504,7 @@ class ADSTask(Task):
 
 class MultilineMessagesFormatter(Formatter):
     converter = time.gmtime
+
     def format(self, record):
         """
         This is mostly the same as logging.Formatter.format except for adding spaces in front
@@ -534,7 +522,7 @@ class MultilineMessagesFormatter(Formatter):
         how to add microsecs. datetime understands that. so we
         have to work around the old time.strftime here."""
         if datefmt:
-            datefmt = datefmt.replace('%f', '%03d' % (record.msecs))
+            datefmt = datefmt.replace('%f', '%03d' % record.msecs)
             return Formatter.formatTime(self, record, datefmt)
         else:
             return Formatter.formatTime(self, record, datefmt) # default ISO8601
@@ -550,8 +538,10 @@ class JsonFormatter(jsonlogger.JsonFormatter, object):
         'ERROR': COLORS['red'],
         'CRITICAL': COLORS['magenta'],
     }
+
     def __init__(self,
-                 fmt="%(asctime) %(name) %(processName) %(filename)  %(funcName) %(levelname) %(lineno) %(module) %(threadName) %(message)",
+                 fmt="%(asctime) %(name) %(processName) %(filename)  %(funcName) %(levelname) %(lineno) %(module) "
+                     "%(threadName) %(message)",
                  datefmt=TIMESTAMP_FMT,
                  use_color=False,
                  extra={}, *args, **kwargs):
@@ -568,10 +558,9 @@ class JsonFormatter(jsonlogger.JsonFormatter, object):
             log_record["asctime"] = log_record["timestamp"]
 
         if self._extra is not None:
-            for key, value in self._extra.items():
+            for key, value in list(self._extra.items()):
                 log_record[key] = value
         return super(JsonFormatter, self).process_log_record(log_record)
-
 
     def formatException(self, ei):
         if ei and not isinstance(ei, tuple):
@@ -586,7 +575,7 @@ class JsonFormatter(jsonlogger.JsonFormatter, object):
         how to add microsecs. datetime understands that. so we
         have to work around the old time.strftime here."""
         if datefmt:
-            datefmt = datefmt.replace('%f', '%03d' % (record.msecs))
+            datefmt = datefmt.replace('%f', '%03d' % record.msecs)
             return Formatter.formatTime(self, record, datefmt)
         else:
             return Formatter.formatTime(self, record, datefmt) # default ISO8601
@@ -623,10 +612,12 @@ class JsonFormatter(jsonlogger.JsonFormatter, object):
         else:
             return safe_str(msg)
 
+
 def get_json_formatter(use_color=False,
-                       logfmt = u'%(asctime)s,%(msecs)03d %(levelname)-8s [%(process)d:%(threadName)s:%(filename)s:%(lineno)d] %(message)s',
-                       datefmt = TIMESTAMP_FMT):
-    return JsonFormatter(logfmt, datefmt, extra={"hostname":socket.gethostname()}, use_color=use_color)
+                       logfmt=u'%(asctime)s,%(msecs)03d %(levelname)-8s '
+                              u'[%(process)d:%(threadName)s:%(filename)s:%(lineno)d] %(message)s',
+                       datefmt=TIMESTAMP_FMT):
+    return JsonFormatter(logfmt, datefmt, extra={"hostname": socket.gethostname()}, use_color=use_color)
 
 
 def u2asc(input):
@@ -640,7 +631,11 @@ def u2asc(input):
     """
 
     # TODO If used on anything but author names, add special handling for math symbols and other special chars
-    if not isinstance(input, unicode):
+    if sys.version_info < (3,):
+        test_type = unicode
+    else:
+        test_type = str
+    if not isinstance(input, test_type):
         try:
             input = input.decode('utf-8')
         except UnicodeDecodeError:
@@ -649,9 +644,9 @@ def u2asc(input):
     try:
         output = unidecode.unidecode(input)
     except UnicodeDecodeError:
-        raise UnicodeHandlerError ('Transliteration failed, check input.')
+        raise UnicodeHandlerError('Transliteration failed, check input.')
 
-    if not isinstance(input,unicode):
+    if not isinstance(input, test_type):
         output = output.encode('utf-8')
 
     return output
@@ -682,7 +677,6 @@ class UTCDateTime(types.TypeDecorator):
             if value.tzname() is None:
                 return value.replace(tzinfo=local_zone).astimezone(tz=utc_zone)
             return value.astimezone(tz=utc_zone) # will raise Error if not datetime
-
 
     def process_result_value(self, value, engine):
         if value is not None:

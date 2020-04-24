@@ -106,3 +106,4 @@ ENV/
 *.idea
 logs/
 python
+**/.DS_Store
