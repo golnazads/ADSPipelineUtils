@@ -22,7 +22,7 @@ def get_git_version(default="v0.0.1"):
         p.stderr.close()
         line = p.stdout.readlines()[0]
         line = line.strip()
-        return line
+        return line.decode()
     except:
         return default
 
