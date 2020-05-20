@@ -10,10 +10,12 @@ Set of common libraries used by the celery workers.
 When a new release is ready, it should be uploaded to pypi. First, try the test environment:
 
 ```
-virtualenv python
-source python/bin/activate
+python3 -m venv ./venv
+source venv/bin/activate
 pip install --upgrade setuptools wheel
-python setup.py sdist bdist_wheel
+rm -rf dist/
+python3 setup.py sdist
+python3 setup.py bdist_wheel --universal
 pip install --upgrade twine
 twine upload --repository-url https://test.pypi.org/legacy/ dist/*
 ```
@@ -23,4 +25,3 @@ Verify the [testing pypi repository](https://test.pypi.org/project/adsputils/) a
 ```
 twine upload dist/*
 ```
-
