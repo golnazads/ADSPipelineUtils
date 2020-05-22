@@ -48,10 +48,7 @@ def _set_json_formatter(logger, colorize=False):
     Replace the default formatters by the json formatter
     """
     for handler in logger.handlers:
-        formatter = handler.formatter
-        handler.formatter = get_json_formatter(use_color=colorize,
-                                               logfmt=formatter._fmt,
-                                               datefmt=TIMESTAMP_FMT)
+        handler.formatter = get_json_formatter(use_color=colorize)
 
 @signals.after_setup_logger.connect
 def on_celery_setup_logging(**kwargs):
@@ -631,8 +628,8 @@ class JsonFormatter(jsonlogger.JsonFormatter, object):
 
 
 def get_json_formatter(use_color=False,
-                       logfmt=u'%(asctime)s,%(msecs)03d %(levelname)-8s '
-                              u'[%(process)d:%(threadName)s:%(filename)s:%(lineno)d] %(message)s',
+                       logfmt="%(asctime) %(name) %(processName) %(filename)  %(funcName) %(levelname) %(lineno) %(module) "
+                              "%(threadName) %(message)",
                        datefmt=TIMESTAMP_FMT):
     return JsonFormatter(logfmt, datefmt, extra={"hostname": socket.gethostname()}, use_color=use_color)
 
