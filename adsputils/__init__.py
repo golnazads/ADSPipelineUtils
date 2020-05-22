@@ -356,7 +356,7 @@ class ADSCelery(Celery):
                 cm = '.'.join(parts)
                 if '.tasks' not in cm:
                     self.logger.debug('It seems like you are not importing from \'.tasks\': %s', cm)
-                self.logger.debug('CELERY_INCLUDE is empty, we have to guess it (correct???): %s', cm)
+                self.logger.warning('CELERY_INCLUDE is empty, we have to guess it (correct???): %s', cm)
             kwargs['include'] = self._config.get('CELERY_INCLUDE', [cm])
 
         Celery.__init__(self, *args, **kwargs)
