@@ -1,8 +1,8 @@
 adsmsg==1.3.6
 concurrent-log-handler==0.9.20
-python-dateutil==2.8.1
+python-dateutil==2.8.2
 DateTime==4.1.1
-celery==4.4.2
+celery==5.4.0
 SQLAlchemy==1.4.50
 python-json-logger==0.1.8
 setuptools<45

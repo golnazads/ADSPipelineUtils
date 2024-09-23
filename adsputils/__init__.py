@@ -33,7 +33,16 @@ from .serializer import register_args
 import random
 from multiprocessing.util import register_after_fork
 from pythonjsonlogger import jsonlogger
-from celery.utils.log import PY3, string_t, text_t, colored, safe_str
+# from celery.utils.log import PY3, string_t, text_t, colored, safe_str
+
+import sys
+from celery.utils.log import colored, safe_str
+PY3 = sys.version_info[0] == 3
+string_t = str
+text_t = str
+
+    
+
 from logging import Formatter
 import unidecode
 from .exceptions import UnicodeHandlerError
